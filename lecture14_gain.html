@@ -1,0 +1,198 @@
+
+<div style="padding: 1rem 0;">
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.2rem;">
+    <div style="flex: 1; min-width: 160px;">
+      <label style="font-size: 13px; color: var(--color-text-secondary);">Forcing freq ω (green)</label>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+        <input type="range" id="omega" min="0.01" max="7.99" step="0.05" value="1.0" style="flex:1;">
+        <span id="omega-out" style="font-size: 14px; font-weight: 500; min-width: 36px;">1.00</span>
+      </div>
+    </div>
+    <div style="flex: 1; min-width: 160px;">
+      <label style="font-size: 13px; color: var(--color-text-secondary);">Natural freq ω₀ (red)</label>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+        <input type="range" id="omega0" min="0.5" max="5.0" step="0.1" value="2.0" style="flex:1;">
+        <span id="omega0-out" style="font-size: 14px; font-weight: 500; min-width: 36px;">2.00</span>
+      </div>
+    </div>
+    <div style="flex: 1; min-width: 160px;">
+      <label style="font-size: 13px; color: var(--color-text-secondary);">Damping c</label>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+        <input type="range" id="damp" min="0.05" max="2.0" step="0.05" value="0.3" style="flex:1;">
+        <span id="damp-out" style="font-size: 14px; font-weight: 500; min-width: 36px;">0.30</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap;">
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.6rem 0.9rem; min-width: 110px;">
+      <div style="font-size: 11px; color: var(--color-text-secondary);">G(ω) at cursor</div>
+      <div id="g-cur" style="font-size: 19px; font-weight: 500; color: var(--color-text-primary);">—</div>
+    </div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.6rem 0.9rem; min-width: 110px;">
+      <div style="font-size: 11px; color: var(--color-text-secondary);">G(0) = 1/ω₀²</div>
+      <div id="g-zero" style="font-size: 19px; font-weight: 500; color: var(--color-text-primary);">—</div>
+    </div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.6rem 0.9rem; min-width: 110px;">
+      <div style="font-size: 11px; color: var(--color-text-secondary);">Peak G(ω)</div>
+      <div id="g-peak" style="font-size: 19px; font-weight: 500; color: var(--color-text-primary);">—</div>
+    </div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.6rem 0.9rem; min-width: 110px;">
+      <div style="font-size: 11px; color: var(--color-text-secondary);">Peak at ω =</div>
+      <div id="w-peak" style="font-size: 19px; font-weight: 500; color: var(--color-text-primary);">—</div>
+    </div>
+  </div>
+
+  <canvas id="gc" width="700" height="300" style="width:100%; height:300px; display:block;"></canvas>
+
+  <div style="display: flex; gap: 18px; margin-top: 10px; font-size: 12px; color: var(--color-text-secondary);">
+    <span><span style="display:inline-block;width:18px;height:3px;background:#378ADD;vertical-align:middle;border-radius:2px;"></span> G(ω)</span>
+    <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #E24B4A;vertical-align:middle;"></span> ω₀ (natural)</span>
+    <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #1D9E75;vertical-align:middle;"></span> ω (forcing)</span>
+  </div>
+</div>
+
+<script>
+var canvas = document.getElementById('gc');
+var ctx    = canvas.getContext('2d');
+
+var PAD = {top: 20, right: 20, bottom: 40, left: 55};
+var WMAX = 8.0;
+var N    = 600;
+
+function Gval(w, w0, c) {
+  var D = Math.pow(w0*w0 - w*w, 2) + 4*c*c*w*w;
+  return 1.0 / Math.sqrt(D);
+}
+
+function toCanvasX(w, W, cw) {
+  return PAD.left + (w / WMAX) * W;
+}
+function toCanvasY(g, yMax, H, ch) {
+  return PAD.top + (1 - g / yMax) * H;
+}
+
+function redraw() {
+  var w0   = parseFloat(document.getElementById('omega0').value);
+  var c    = parseFloat(document.getElementById('damp').value);
+  var wCur = parseFloat(document.getElementById('omega').value);
+
+  document.getElementById('omega0-out').textContent = w0.toFixed(2);
+  document.getElementById('damp-out').textContent   = c.toFixed(2);
+  document.getElementById('omega-out').textContent  = wCur.toFixed(2);
+
+  var CW = canvas.width;
+  var CH = canvas.height;
+  var W  = CW - PAD.left - PAD.right;
+  var H  = CH - PAD.top  - PAD.bottom;
+
+  var points = [];
+  var peakG = 0, peakW = 0;
+  for (var i = 0; i <= N; i++) {
+    var w = (i / N) * WMAX;
+    var g = Gval(w, w0, c);
+    points.push([w, g]);
+    if (g > peakG) { peakG = g; peakW = w; }
+  }
+
+  var yMax   = Math.min(peakG * 1.15, 15);
+  var gCur   = Gval(wCur, w0, c);
+  var g0     = 1.0 / (w0 * w0);
+
+  document.getElementById('g-cur').textContent  = gCur  > 50 ? '>50' : gCur.toFixed(4);
+  document.getElementById('g-zero').textContent = g0.toFixed(4);
+  document.getElementById('g-peak').textContent = peakG > 50 ? '>50' : peakG.toFixed(4);
+  document.getElementById('w-peak').textContent = peakW.toFixed(3);
+
+  ctx.clearRect(0, 0, CW, CH);
+
+  var gridColor = 'rgba(136,135,128,0.2)';
+  var textColor = '#888780';
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = textColor;
+  ctx.textAlign = 'center';
+
+  var xTicks = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  xTicks.forEach(function(v) {
+    var x = toCanvasX(v, W, CW);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + H); ctx.stroke();
+    ctx.fillText(v.toString(), x, PAD.top + H + 18);
+  });
+
+  var yTicks = [];
+  var step = yMax <= 3 ? 0.5 : yMax <= 6 ? 1 : yMax <= 12 ? 2 : 3;
+  for (var v = 0; v <= yMax; v += step) yTicks.push(parseFloat(v.toFixed(2)));
+  ctx.textAlign = 'right';
+  yTicks.forEach(function(v) {
+    var y = toCanvasY(v, yMax, H, CH);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + W, y); ctx.stroke();
+    ctx.fillText(v.toFixed(1), PAD.left - 8, y + 4);
+  });
+
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
+  ctx.strokeRect(PAD.left, PAD.top, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = textColor;
+  ctx.fillText('ω (driving frequency)', PAD.left + W / 2, CH - 5);
+  ctx.save();
+  ctx.translate(14, PAD.top + H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('G(ω)', 0, 0);
+  ctx.restore();
+
+  function dashedVertical(wVal, color) {
+    var x = toCanvasX(wVal, W, CW);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, PAD.top);
+    ctx.lineTo(x, PAD.top + H);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  dashedVertical(w0,   '#E24B4A');
+  dashedVertical(wCur, '#1D9E75');
+
+  ctx.save();
+  ctx.beginPath();
+  var first = true;
+  points.forEach(function(pt) {
+    var px = toCanvasX(pt[0], W, CW);
+    var py = toCanvasY(Math.min(pt[1], yMax), yMax, H, CH);
+    if (first) { ctx.moveTo(px, py); first = false; }
+    else        { ctx.lineTo(px, py); }
+  });
+  ctx.strokeStyle = '#378ADD';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  ctx.restore();
+
+  var dotX = toCanvasX(wCur, W, CW);
+  var dotY = toCanvasY(Math.min(gCur, yMax), yMax, H, CH);
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 5, 0, 2 * Math.PI);
+  ctx.fillStyle = '#1D9E75';
+  ctx.fill();
+}
+
+document.getElementById('omega').addEventListener('input', redraw);
+document.getElementById('omega0').addEventListener('input', redraw);
+document.getElementById('damp').addEventListener('input', redraw);
+
+window.addEventListener('resize', function() {
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = 300;
+  redraw();
+});
+
+canvas.width  = canvas.offsetWidth || 700;
+canvas.height = 300;
+redraw();
+</script>
