@@ -1,0 +1,156 @@
+
+<style>
+  .cv-wrap { padding: 1rem 0; font-family: var(--font-sans); }
+  .cv-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 1.2rem; }
+  .cv-label { font-size: 13px; color: var(--color-text-secondary); min-width: 32px; }
+  .cv-val { font-size: 14px; font-weight: 500; min-width: 40px; color: var(--color-text-primary); }
+  .cv-panel { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; margin-bottom: 10px; }
+  .cv-panel-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 2px; }
+  .cv-caption { font-size: 12px; color: var(--color-text-secondary); margin-top: 5px; min-height: 32px; line-height: 1.5; }
+  .cv-result { text-align: center; font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-top: 10px; padding: 0.6rem 1rem; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+  .cv-result-caption { font-size: 12px; color: var(--color-text-secondary); text-align: center; margin-top: 5px; min-height: 18px; }
+</style>
+<div class="cv-wrap">
+  <div class="cv-controls">
+    <span class="cv-label">t =</span>
+    <input type="range" min="0.1" max="3.0" step="0.05" value="1.5" id="tSlider" style="flex:1;" />
+    <span class="cv-val" id="tVal">1.50</span>
+  </div>
+
+  <div class="cv-panel">
+    <div class="cv-panel-title">① g(τ) = (1/π) sin(πτ) — fixed in place</div>
+    <div style="position:relative;height:120px;"><canvas id="chartG" role="img" aria-label="Plot of g(tau) = sin(pi*tau)/pi"></canvas></div>
+    <div class="cv-caption" id="capG">g(τ) is fixed. It does not move as t changes. It represents the system's memory — all past values of the input from τ = 0 to τ = t.</div>
+  </div>
+
+  <div class="cv-panel">
+    <div class="cv-panel-title">② f(t−τ) = cos(π(t−τ)) — flipped, then slid right as t grows</div>
+    <div style="position:relative;height:120px;"><canvas id="chartF" role="img" aria-label="Plot of f(t-tau) = cos(pi*(t-tau))"></canvas></div>
+    <div class="cv-caption" id="capF">Loading…</div>
+  </div>
+
+  <div class="cv-panel">
+    <div class="cv-panel-title">③ f(t−τ)·g(τ) — pointwise product; its area gives h(t)</div>
+    <div style="position:relative;height:120px;"><canvas id="chartP" role="img" aria-label="Plot of product f(t-tau)*g(tau)"></canvas></div>
+    <div class="cv-caption" id="capP">Loading…</div>
+  </div>
+
+  <div class="cv-result" id="resultVal">h(t) = …</div>
+  <div class="cv-result-caption" id="capResult">Loading…</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const N = 100;
+const tauMax = 3.2;
+function linspace(a,b,n){ const arr=[]; for(let i=0;i<n;i++) arr.push(a+(b-a)*i/(n-1)); return arr; }
+const taus = linspace(0, tauMax, N);
+
+function makeDatasets(t){
+  const gVals = taus.map(tau => tau<=t ? (1/Math.PI)*Math.sin(Math.PI*tau) : null);
+  const fVals = taus.map(tau => tau<=t ? Math.cos(Math.PI*(t-tau)) : null);
+  const pVals = taus.map(tau => tau<=t ? Math.cos(Math.PI*(t-tau))*(1/Math.PI)*Math.sin(Math.PI*tau) : null);
+  return {gVals, fVals, pVals};
+}
+
+function numericalConv(t){
+  const steps = 400, dt = t/steps;
+  let sum = 0;
+  for(let i=0;i<steps;i++){
+    const tau = i*dt;
+    sum += Math.cos(Math.PI*(t-tau))*(1/Math.PI)*Math.sin(Math.PI*tau)*dt;
+  }
+  return sum;
+}
+
+function fCaption(t){
+  const phase = (t % 2).toFixed(2);
+  if(t < 0.5) return `At t = ${t.toFixed(2)}, the window [0, t] is very narrow. Only a tiny sliver of f(t−τ) is visible. The cosine starts near its peak (cos(0) = 1) at τ = t and descends leftward.`;
+  if(t < 1.0) return `At t = ${t.toFixed(2)}, f(t−τ) = cos(π(t−τ)) is a cosine reading right-to-left. At τ = t it equals cos(0) = 1 (its peak). Moving left toward τ = 0 it equals cos(πt) = ${Math.cos(Math.PI*t).toFixed(2)}. The function is flipped relative to a normal cosine.`;
+  if(t < 1.5) return `At t = ${t.toFixed(2)}, the cosine has shifted right. Its peak (value 1) always anchors at τ = t and descends leftward. The left tail at τ = 0 equals cos(π×${t.toFixed(2)}) = ${Math.cos(Math.PI*t).toFixed(2)} — now negative, meaning f has passed a half-period.`;
+  if(t < 2.0) return `At t = ${t.toFixed(2)}, f(t−τ) spans more than one full period on [0, t]. The right end (τ = t) stays pinned at 1. The left tail at τ = 0 is cos(πt) = ${Math.cos(Math.PI*t).toFixed(2)}. Increasing t slides the whole cosine further right, revealing more of its oscillation.`;
+  return `At t = ${t.toFixed(2)}, f(t−τ) now spans nearly a full cycle. Its peak is always at τ = t. As t grows, the cosine continues sliding right — more periods become visible in the integration window.`;
+}
+
+function pCaption(t){
+  const val = numericalConv(t);
+  const sign = val > 0.01 ? 'positive' : val < -0.01 ? 'negative' : 'near zero';
+  const signMeaning = val > 0.01
+    ? 'the two functions reinforce each other — the area accumulates positively.'
+    : val < -0.01
+    ? 'the two functions partially cancel — negative regions dominate.'
+    : 'positive and negative contributions nearly cancel each other out.';
+  if(t < 0.5) return `The product is very small — both g and f are small near τ = 0. The integral barely accumulates yet.`;
+  return `The product f(t−τ)·g(τ) blends how much g "remembers" at each τ, weighted by how much f contributes from that lag. The net area is ${sign} (h ≈ ${val.toFixed(3)}), meaning ${signMeaning}`;
+}
+
+function resultCaption(t, val){
+  if(t < 0.6) return `Very small t: the integration window is tiny, so h(t) ≈ 0. Convolution has barely "started."`;
+  if(t < 1.0) return `h(t) is growing as the window expands. Both cos and sin are positive here, so their product contributes positively.`;
+  if(Math.abs(t - 1.0) < 0.15) return `Near t = 1/π ≈ 0.32, h reaches a local peak. After this, the cosine's negative lobe begins entering the window.`;
+  if(val > 0) return `h(${t.toFixed(2)}) > 0: positive contributions from the product outweigh negative ones in [0, t].`;
+  if(val < -0.01) return `h(${t.toFixed(2)}) < 0: the negative lobe of f(t−τ) now overlaps substantially with g(τ), pulling the integral negative.`;
+  return `h(${t.toFixed(2)}) ≈ 0: positive and negative regions of the product nearly cancel over [0, t].`;
+}
+
+const commonOpts = (minY, maxY) => ({
+  responsive:true, maintainAspectRatio:false, animation:false,
+  plugins:{ legend:{display:false} },
+  scales:{
+    x:{ type:'linear', min:0, max:tauMax, ticks:{maxTicksLimit:5, font:{size:10}}, grid:{color:'rgba(128,128,128,0.12)'} },
+    y:{ min:minY, max:maxY, ticks:{maxTicksLimit:4, font:{size:10}}, grid:{color:'rgba(128,128,128,0.12)'} }
+  }
+});
+
+function makeChart(id, pts, color, minY, maxY, fill, fillColor){
+  return new Chart(document.getElementById(id),{
+    type:'line',
+    data:{ datasets:[{
+      data: pts,
+      borderColor: color, borderWidth: 2,
+      pointRadius: 0, spanGaps: false,
+      fill: fill ? 'origin' : false,
+      backgroundColor: fill ? fillColor : undefined
+    }]},
+    options: commonOpts(minY, maxY)
+  });
+}
+
+function pts(vals){ return vals.map((v,i)=>({x:taus[i], y:v})); }
+
+let t = 1.5;
+let {gVals, fVals, pVals} = makeDatasets(t);
+
+const cg = makeChart('chartG', pts(gVals), '#185FA5', -0.5, 0.5, false);
+const cf = makeChart('chartF', pts(fVals), '#0F6E56', -1.3, 1.3, false);
+const cp = makeChart('chartP', pts(pVals), '#993C1D', -0.45, 0.45, true, 'rgba(216,90,48,0.15)');
+
+function update(newT){
+  t = newT;
+  const d = makeDatasets(t);
+  cg.data.datasets[0].data = pts(d.gVals);
+  cf.data.datasets[0].data = pts(d.fVals);
+  cp.data.datasets[0].data = pts(d.pVals);
+  cg.update(); cf.update(); cp.update();
+
+  const hval = numericalConv(t);
+
+  document.getElementById('capG').textContent =
+    `g(τ) is anchored. Its shape never changes — a sine arch scaled by 1/π. As t increases, more of it (from 0 to t) enters the integration window, shown by how much of the curve is drawn. At τ = t the window boundary sits at g(t) = ${((1/Math.PI)*Math.sin(Math.PI*t)).toFixed(3)}.`;
+
+  document.getElementById('capF').textContent = fCaption(t);
+  document.getElementById('capP').textContent = pCaption(t);
+
+  document.getElementById('resultVal').textContent =
+    'h(' + t.toFixed(2) + ') = ∫₀ᵗ cos(π(t−τ))·(1/π)sin(πτ) dτ ≈ ' + hval.toFixed(4);
+
+  document.getElementById('capResult').textContent = resultCaption(t, hval);
+}
+
+document.getElementById('tSlider').addEventListener('input', function(){
+  const v = parseFloat(this.value);
+  document.getElementById('tVal').textContent = v.toFixed(2);
+  update(v);
+});
+update(1.5);
+</script>
