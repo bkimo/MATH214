@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convolution: Flip and Slide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.08);
+    --text: #e8e6df;
+    --muted: #7a7a8c;
+    --blue: #5b9cf6;
+    --teal: #3ecfaa;
+    --coral: #f07a5a;
+    --amber: #f5c542;
+    --accent: #5b9cf6;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', Georgia, serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 3rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2rem;
+    max-width: 720px;
+  }
+
+  .lecture-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: .5rem;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 300;
+    letter-spacing: -.01em;
+    line-height: 1.25;
+    color: var(--text);
+    margin-bottom: .6rem;
+  }
+
+  h1 em { font-style: italic; color: var(--blue); }
+
+  .subtitle {
+    font-size: .9rem;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.6;
+  }
+
+  .formula-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .75rem 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .9rem;
+    color: var(--blue);
+    margin: 1.2rem auto;
+    max-width: 520px;
+    text-align: center;
+    letter-spacing: .02em;
+  }
+
+  .main-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 1.5rem;
+  }
+
+  .slider-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .85rem;
+    color: var(--muted);
+    min-width: 28px;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+    transition: transform .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .t-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--blue);
+    min-width: 44px;
+    text-align: right;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 560px) { .panels { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
+  .panel-full {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 12px;
+  }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: .05em;
+  }
+
+  .panel-caption {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.55;
+    min-height: 48px;
+    font-weight: 300;
+  }
+
+  canvas { width: 100%; display: block; }
+
+  .result-bar {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: .85rem 1.2rem;
+    margin-bottom: 12px;
+  }
+
+  .result-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+
+  .result-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--amber);
+  }
+
+  .result-caption {
+    text-align: center;
+    font-size: .78rem;
+    color: var(--muted);
+    font-weight: 300;
+    min-height: 18px;
+    line-height: 1.5;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 1.2rem;
+  }
+
+  .leg {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .78rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .leg-line {
+    width: 24px;
+    height: 2.5px;
+    border-radius: 2px;
+  }
+
+  footer {
+    margin-top: 2rem;
+    font-size: .75rem;
+    color: var(--muted);
+    text-align: center;
+    font-weight: 300;
+    letter-spacing: .02em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="lecture-tag">Lecture 20 · MATH 214</div>
+  <h1>Convolution: <em>Flip and Slide</em></h1>
+  <p class="subtitle">
+    At each value of <i>t</i>, one function is flipped and slid across the other.<br>
+    The signed area of their product gives <i>h(t) = (f ∗ g)(t)</i>.
+  </p>
+  <div class="formula-bar">(f ∗ g)(t) = ∫₀ᵗ f(t−τ) · g(τ) dτ</div>
+</header>
+
+<div class="main-card">
+  <div class="slider-row">
+    <span class="slider-label">t =</span>
+    <input type="range" id="tSlider" min="0.1" max="3.0" step="0.05" value="1.5">
+    <span class="t-val" id="tVal">1.50</span>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-label">① g(τ) = (1/π) sin(πτ) — fixed</div>
+      <div style="position:relative;height:130px;"><canvas id="cG"></canvas></div>
+      <div class="panel-caption" id="capG"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">② f(t−τ) = cos(π(t−τ)) — flipped &amp; slid</div>
+      <div style="position:relative;height:130px;"><canvas id="cF"></canvas></div>
+      <div class="panel-caption" id="capF"></div>
+    </div>
+  </div>
+
+  <div class="panel-full">
+    <div class="panel-label">③ product f(t−τ)·g(τ) — shaded area = h(t)</div>
+    <div style="position:relative;height:130px;"><canvas id="cP"></canvas></div>
+    <div class="panel-caption" id="capP"></div>
+  </div>
+
+  <div class="result-bar">
+    <span class="result-label">h(t) ≈</span>
+    <span class="result-val" id="rVal">—</span>
+    <span class="result-label" style="margin-left:6px;" id="rEq"></span>
+  </div>
+  <div class="result-caption" id="rCap"></div>
+
+  <div class="legend">
+    <div class="leg"><div class="leg-line" style="background:#5b9cf6;"></div>g(τ)</div>
+    <div class="leg"><div class="leg-line" style="background:#3ecfaa;"></div>f(t−τ)</div>
+    <div class="leg"><div class="leg-line" style="background:#f07a5a;"></div>product · area</div>
+    <div class="leg"><div class="leg-line" style="background:#f5c542;"></div>h(t) accumulation</div>
+  </div>
+</div>
+
+<footer>MATH 214 · Interactive visualization · drag the slider to animate</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const N = 120, tauMax = 3.2;
+const taus = Array.from({length:N}, (_,i) => i*tauMax/(N-1));
+
+function gFn(tau) { return (1/Math.PI)*Math.sin(Math.PI*tau); }
+function fFn(t,tau) { return Math.cos(Math.PI*(t-tau)); }
+function pFn(t,tau) { return fFn(t,tau)*gFn(tau); }
+
+function numericalConv(t) {
+  const steps=400, dt=t/steps; let s=0;
+  for(let i=0;i<steps;i++) { const tau=i*dt; s+=fFn(t,tau)*gFn(tau)*dt; }
+  return s;
+}
+
+function pts(fn, t) {
+  return taus.map(tau => ({x:+tau.toFixed(4), y: tau<=t ? +fn(tau).toFixed(5) : null}));
+}
+
+const baseOpts = (minY,maxY,color) => ({
+  responsive:true, maintainAspectRatio:false, animation:false,
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{type:'linear',min:0,max:tauMax,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7a8c',maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"}}},
+    y:{min:minY,max:maxY,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7a8c',maxTicksLimit:4,font:{size:10,family:"'JetBrains Mono'"}}}
+  }
+});
+
+function makeChart(id, color, minY, maxY, fill) {
+  return new Chart(document.getElementById(id), {
+    type:'line',
+    data:{datasets:[{
+      data:[],
+      borderColor:color, borderWidth:2, pointRadius:0, spanGaps:false,
+      fill: fill ? 'origin' : false,
+      backgroundColor: fill ? color.replace(')',',0.18)').replace('rgb','rgba') : undefined
+    }]},
+    options: baseOpts(minY,maxY,color)
+  });
+}
+
+const cG = makeChart('cG','#5b9cf6',-0.5,0.5,false);
+const cF = makeChart('cF','#3ecfaa',-1.3,1.3,false);
+const cP = makeChart('cP','#f07a5a',-0.45,0.45,true);
+
+function capG(t) {
+  const gAtT = gFn(Math.min(t, tauMax-0.01));
+  return `g(τ) is anchored — its shape never changes. As t grows, more of it (from 0 to t) enters the integration window. Right edge value: g(${t.toFixed(2)}) ≈ ${gAtT.toFixed(3)}.`;
+}
+
+function capF(t) {
+  const leftVal = Math.cos(Math.PI*t).toFixed(3);
+  if(t<0.6) return `f(t−τ) = cos(π(t−τ)). Very narrow window — only a sliver is visible. At τ = t the cosine equals cos(0) = 1 (its peak).`;
+  if(t<1.2) return `f(t−τ) reads right-to-left: peak (value 1) pins at τ = t and descends leftward. Left tail at τ = 0: cos(πt) = ${leftVal}.`;
+  if(t<2.0) return `The cosine has slid further right. Peak still anchors at τ = t. Left tail = ${leftVal} — negative now (past a half-period). More oscillation is visible.`;
+  return `f(t−τ) now spans nearly a full cycle. As t keeps growing, the entire cosine continues sliding right, revealing more periods.`;
+}
+
+function capP(t) {
+  const val = numericalConv(t);
+  const sign = val > 0.01 ? 'positive' : val < -0.01 ? 'negative' : 'near zero';
+  const why = val > 0.01 ? 'f and g reinforce each other over [0,t].' : val < -0.01 ? 'the negative lobe of f dominates.' : 'positive and negative contributions cancel.';
+  return `Signed area of the product = h(${t.toFixed(2)}) ≈ ${val.toFixed(4)} (${sign}): ${why}`;
+}
+
+function rCap(t, val) {
+  if(t<0.5) return 'Integration window tiny — h(t) barely accumulates yet.';
+  if(val > 0.01) return 'Both functions contribute positively — h(t) > 0.';
+  if(val < -0.01) return "Cosine's negative lobe overlaps g — h(t) < 0.";
+  return 'Positive and negative regions nearly cancel — h(t) ≈ 0.';
+}
+
+function update(t) {
+  cG.data.datasets[0].data = pts(tau=>gFn(tau), t);
+  cF.data.datasets[0].data = pts(tau=>fFn(t,tau), t);
+  cP.data.datasets[0].data = pts(tau=>pFn(t,tau), t);
+  cG.update(); cF.update(); cP.update();
+
+  const val = numericalConv(t);
+  const closedForm = t*Math.sin(Math.PI*t)/(2*Math.PI);
+
+  document.getElementById('rVal').textContent = val.toFixed(5);
+  document.getElementById('rEq').textContent = `≈ t·sin(πt)/(2π) = ${closedForm.toFixed(5)}`;
+  document.getElementById('capG').textContent = capG(t);
+  document.getElementById('capF').textContent = capF(t);
+  document.getElementById('capP').textContent = capP(t);
+  document.getElementById('rCap').textContent  = rCap(t, val);
+}
+
+const slider = document.getElementById('tSlider');
+slider.addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  document.getElementById('tVal').textContent = v.toFixed(2);
+  update(v);
+});
+update(1.5);
+</script>
+</body>
+</html>
