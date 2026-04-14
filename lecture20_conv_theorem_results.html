@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convolution Theorem — Results</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.08);
+    --text: #e8e6df;
+    --muted: #7a7a8c;
+    --blue: #5b9cf6;
+    --teal: #3ecfaa;
+    --coral: #f07a5a;
+    --amber: #f5c542;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header { text-align: center; margin-bottom: 2rem; max-width: 760px; }
+  .lecture-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .15em; color: var(--muted); text-transform: uppercase; margin-bottom: .5rem; }
+  h1 { font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 300; letter-spacing: -.01em; line-height: 1.25; color: var(--text); margin-bottom: .5rem; }
+  h1 em { font-style: italic; color: var(--teal); }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
+    padding: .45rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .03em;
+  }
+
+  .tab.active {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+  }
+
+  .tab:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 1rem;
+  }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .formula-strip {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: .8rem 1.2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    color: var(--teal);
+    margin-bottom: 1.2rem;
+    letter-spacing: .02em;
+    line-height: 1.7;
+  }
+
+  .step-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 1.2rem;
+  }
+
+  .step {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: .85rem;
+  }
+
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .7rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: .08em;
+  }
+
+  .step-body {
+    font-size: .82rem;
+    line-height: 1.55;
+    font-weight: 300;
+    color: var(--text);
+  }
+
+  .step-body code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
+    color: var(--amber);
+  }
+
+  .chart-wrap { position: relative; margin-bottom: 1rem; }
+
+  .caption {
+    font-size: .8rem;
+    color: var(--muted);
+    line-height: 1.6;
+    font-weight: 300;
+    margin-top: .6rem;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: .8rem;
+  }
+
+  .leg { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--muted); font-weight: 300; }
+  .leg-line { width: 22px; height: 2.5px; border-radius: 2px; }
+  .leg-dash { width: 22px; height: 0; border-top: 2.5px dashed; }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 1.2rem;
+  }
+
+  .ctrl {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: .75rem .9rem;
+  }
+
+  .ctrl-label { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+  .ctrl-val { font-size: 1rem; font-weight: 500; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
+  input[type=range] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 2px; background: #333; outline: none; cursor: pointer; margin-top: 4px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); cursor: pointer;
+  }
+
+  .region-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .region {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: .75rem .9rem;
+    font-size: .8rem;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.55;
+  }
+
+  .region strong {
+    display: block;
+    font-size: .82rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  footer { margin-top: 2rem; font-size: .75rem; color: var(--muted); text-align: center; font-weight: 300; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="lecture-tag">Lecture 20 · MATH 214</div>
+  <h1>Convolution Theorem — <em>Results & Applications</em></h1>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('ex202')">Example 20.2 — h(t)</div>
+  <div class="tab" onclick="showTab('ex204')">Example 20.4 — Pulse ODE</div>
+  <div class="tab" onclick="showTab('pr205')">Practice 20.5 — Impulse ODE</div>
+</div>
+
+<div class="card">
+
+  <!-- TAB: Example 20.2 -->
+  <div class="section active" id="ex202">
+    <div class="formula-strip">
+      H(s) = s/(s²+π²)²  →  split as F(s)·G(s)  →  h(t) = t·sin(πt) / (2π)
+    </div>
+
+    <div class="step-grid">
+      <div class="step">
+        <div class="step-num">STEP 1 — FACTOR</div>
+        <div class="step-body">Split: <code>F(s) = s/(s²+π²)</code> and <code>G(s) = 1/(s²+π²)</code></div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 2 — INVERT</div>
+        <div class="step-body"><code>f(t) = cos(πt)</code><br><code>g(t) = (1/π)sin(πt)</code></div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 3 — PRODUCT-TO-SUM</div>
+        <div class="step-body">cos(A)·sin(B) = ½[sin(A+B)−sin(A−B)]<br>A+B = πt is constant in τ — integral simplifies.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 4 — RESULT</div>
+        <div class="step-body"><code>h(t) = t·sin(πt)/(2π)</code><br>Amplitude grows linearly — resonance shape.</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-line" style="background:#5b9cf6;"></div>closed form t·sin(πt)/(2π)</div>
+      <div class="leg"><div class="leg-dash" style="border-color:#f07a5a;"></div>numerical convolution</div>
+    </div>
+    <div class="chart-wrap" style="height:240px;"><canvas id="chartH"></canvas></div>
+    <div class="caption">
+      The two curves lie exactly on top of each other — verifying the Convolution Theorem.
+      Notice the shape: <i>h(t)</i> is a sine wave whose amplitude envelope grows as <i>±t/(2π)</i>
+      (the dashed lines). This linearly growing amplitude is the hallmark of <b>resonance</b> —
+      compare with Lecture 13 where the same t·sin shape appeared.
+    </div>
+  </div>
+
+  <!-- TAB: Example 20.4 -->
+  <div class="section" id="ex204">
+    <div class="formula-strip">
+      y″ + 3y′ + 2y = r(t),  y(0)=y′(0)=0  |  r(t) = 1 if 1&lt;t&lt;2, else 0
+    </div>
+    <div class="step-grid">
+      <div class="step">
+        <div class="step-num">STEP 1 — LAPLACE</div>
+        <div class="step-body">(s²+3s+2)Y = (e⁻ˢ−e⁻²ˢ)/s</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 2 — SOLVE</div>
+        <div class="step-body">Y(s) = G(s)·(e⁻ˢ−e⁻²ˢ)<br>where G(s) = 1/[s(s+1)(s+2)]</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 3 — PARTIAL FRACTIONS</div>
+        <div class="step-body">g(t) = ½ − e⁻ᵗ + ½e⁻²ᵗ</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 4 — SHIFT THEOREM</div>
+        <div class="step-body">y(t) = g(t−1)u(t−1) − g(t−2)u(t−2)</div>
+      </div>
+    </div>
+
+    <div class="region-grid">
+      <div class="region"><strong>0 &lt; t &lt; 1</strong>Pulse has not arrived — system is at rest. y(t) = 0 exactly.</div>
+      <div class="region"><strong>1 &lt; t &lt; 2</strong>Pulse is on. System is driven. Response builds toward steady state ½.</div>
+      <div class="region"><strong>t &gt; 2  (full width)</strong>Pulse switches off. Two decaying exponentials interfere. y(t) → 0.</div>
+      <div class="region"><strong>Key insight</strong>The pulse ends before y reaches ½ — so the system partially charges then freely decays.</div>
+    </div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-line" style="background:#5b9cf6;"></div>y(t) — system response</div>
+      <div class="leg"><div class="leg-dash" style="border-color:#f5c542;"></div>r(t) — pulse (scaled ×0.3)</div>
+    </div>
+    <div class="chart-wrap" style="height:240px;"><canvas id="chartPulse"></canvas></div>
+    <div class="caption">
+      The response is zero until <i>t = 1</i>, rises smoothly during the pulse, then decays after <i>t = 2</i>.
+      Note the slight inflection as the pulse shuts off — the system has stored energy and releases it gradually.
+    </div>
+  </div>
+
+  <!-- TAB: Practice 20.5 -->
+  <div class="section" id="pr205">
+    <div class="formula-strip">
+      y′ + ky = δ(t−T),  y(0) = y₀  →  y(t) = y₀e⁻ᵏᵗ + e⁻ᵏ⁽ᵗ⁻ᵀ⁾u(t−T)
+    </div>
+
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-label">k — decay rate</div>
+        <input type="range" id="kS" min="0.2" max="3.0" step="0.1" value="0.5" oninput="upImp()">
+        <div class="ctrl-val" id="kV">0.5</div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label">T — impulse time</div>
+        <input type="range" id="TS" min="0.5" max="5.0" step="0.1" value="2.0" oninput="upImp()">
+        <div class="ctrl-val" id="TV">2.0</div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label">y₀ — initial value</div>
+        <input type="range" id="yS" min="0.0" max="3.0" step="0.1" value="1.0" oninput="upImp()">
+        <div class="ctrl-val" id="yV">1.0</div>
+      </div>
+    </div>
+
+    <div class="region-grid">
+      <div class="region"><strong>0 &lt; t &lt; T</strong>Free decay from y₀. No external input — just y = y₀e⁻ᵏᵗ.</div>
+      <div class="region"><strong>t &gt; T</strong>δ(t−T) injects +1 instantly. y jumps, then both terms decay together.</div>
+      <div class="region"><strong>y₀ = 0 case</strong>Pure impulse response = e⁻ᵏ⁽ᵗ⁻ᵀ⁾u(t−T). This is the <i>Green's function</i> of the operator.</div>
+      <div class="region"><strong>Physical meaning</strong>The impulse delivers a unit "kick" at t = T regardless of prior state. Large k → fast decay after kick.</div>
+    </div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-line" style="background:#5b9cf6;"></div>y(t) — full solution</div>
+      <div class="leg"><div class="leg-dash" style="border-color:#7a7a8c;"></div>y₀e⁻ᵏᵗ — free decay</div>
+      <div class="leg"><div class="leg-line" style="background:#f07a5a;"></div>impulse term</div>
+    </div>
+    <div class="chart-wrap" style="height:240px;"><canvas id="chartImp"></canvas></div>
+    <div class="caption" id="impCap"></div>
+  </div>
+
+</div>
+
+<footer>MATH 214 · Lecture 20 · Convolution Theorem results</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+const commonOpts = (minY, maxY) => ({
+  responsive:true, maintainAspectRatio:false, animation:false,
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{type:'linear', grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#7a7a8c',maxTicksLimit:7,font:{size:10,family:"'JetBrains Mono'"}}},
+    y:{min:minY, max:maxY, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#7a7a8c',maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"}}}
+  }
+});
+
+/* ---- Example 20.2 ---- */
+(function(){
+  const N=300, tMax=5.0;
+  const ts = Array.from({length:N},(_,i)=>i*tMax/(N-1));
+  function closed(t){ return t*Math.sin(Math.PI*t)/(2*Math.PI); }
+  function numConv(t){
+    if(t<0.001) return 0;
+    const steps=300, dt=t/steps; let s=0;
+    for(let i=0;i<steps;i++){ const tau=i*dt; s+=Math.cos(Math.PI*(t-tau))*(1/Math.PI)*Math.sin(Math.PI*tau)*dt; }
+    return s;
+  }
+  const cfPts = ts.map(t=>({x:+t.toFixed(3),y:+closed(t).toFixed(5)}));
+  const numPts= ts.map(t=>({x:+t.toFixed(3),y:+numConv(t).toFixed(5)}));
+  const envP  = ts.map(t=>({x:+t.toFixed(3),y:+(t/(2*Math.PI)).toFixed(5)}));
+  const envN  = ts.map(t=>({x:+t.toFixed(3),y:+(-t/(2*Math.PI)).toFixed(5)}));
+
+  new Chart(document.getElementById('chartH'),{
+    type:'line',
+    data:{datasets:[
+      {data:cfPts,  borderColor:'#5b9cf6', borderWidth:2.5, pointRadius:0, fill:false},
+      {data:numPts, borderColor:'#f07a5a', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false},
+      {data:envP,   borderColor:'rgba(245,197,66,0.3)', borderWidth:1, borderDash:[3,3], pointRadius:0, fill:false},
+      {data:envN,   borderColor:'rgba(245,197,66,0.3)', borderWidth:1, borderDash:[3,3], pointRadius:0, fill:false},
+    ]},
+    options: commonOpts(-0.9,0.9)
+  });
+})();
+
+/* ---- Example 20.4 ---- */
+(function(){
+  const N=300, tMax=6.0;
+  const ts = Array.from({length:N},(_,i)=>i*tMax/(N-1));
+  function g(t){ return 0.5 - Math.exp(-t) + 0.5*Math.exp(-2*t); }
+  function y(t){ if(t<=1) return 0; if(t<=2) return g(t-1); return g(t-1)-g(t-2); }
+  function r(t){ return (t>1&&t<2)?0.3:0; }
+  new Chart(document.getElementById('chartPulse'),{
+    type:'line',
+    data:{datasets:[
+      {data:ts.map(t=>({x:+t.toFixed(3),y:+y(t).toFixed(5)})), borderColor:'#5b9cf6', borderWidth:2.5, pointRadius:0, fill:false},
+      {data:ts.map(t=>({x:+t.toFixed(3),y:r(t)})), borderColor:'#f5c542', borderWidth:1.5, borderDash:[4,3], pointRadius:0, stepped:true, fill:false},
+    ]},
+    options: commonOpts(-0.05, 0.4)
+  });
+})();
+
+/* ---- Practice 20.5 ---- */
+let impChart;
+(function(){
+  const N=300, tMax=8.0;
+  const ts = Array.from({length:N},(_,i)=>i*tMax/(N-1));
+
+  function makeData(k, T, y0){
+    function yFull(t){ return y0*Math.exp(-k*t) + (t>=T ? Math.exp(-k*(t-T)) : 0); }
+    function yDecay(t){ return y0*Math.exp(-k*t); }
+    function yImp(t){ return t>=T ? Math.exp(-k*(t-T)) : 0; }
+    return {
+      full:  ts.map(t=>({x:+t.toFixed(3),y:+yFull(t).toFixed(5)})),
+      decay: ts.map(t=>({x:+t.toFixed(3),y:+yDecay(t).toFixed(5)})),
+      imp:   ts.map(t=>({x:+t.toFixed(3),y:+yImp(t).toFixed(5)})),
+    };
+  }
+
+  const {full,decay,imp} = makeData(0.5,2.0,1.0);
+
+  impChart = new Chart(document.getElementById('chartImp'),{
+    type:'line',
+    data:{datasets:[
+      {data:full,  borderColor:'#5b9cf6', borderWidth:2.5, pointRadius:0, fill:false},
+      {data:decay, borderColor:'#7a7a8c', borderWidth:1.5, borderDash:[4,3], pointRadius:0, fill:false},
+      {data:imp,   borderColor:'#f07a5a', borderWidth:2, pointRadius:0, fill:false},
+    ]},
+    options: commonOpts(-0.1, 3.2)
+  });
+})();
+
+function upImp(){
+  const k = parseFloat(document.getElementById('kS').value);
+  const T = parseFloat(document.getElementById('TS').value);
+  const y0= parseFloat(document.getElementById('yS').value);
+  document.getElementById('kV').textContent = k.toFixed(1);
+  document.getElementById('TV').textContent = T.toFixed(1);
+  document.getElementById('yV').textContent = y0.toFixed(1);
+
+  const N=300, tMax=8.0;
+  const ts = Array.from({length:N},(_,i)=>i*tMax/(N-1));
+  function yFull(t){ return y0*Math.exp(-k*t) + (t>=T ? Math.exp(-k*(t-T)) : 0); }
+  function yDecay(t){ return y0*Math.exp(-k*t); }
+  function yImp(t){ return t>=T ? Math.exp(-k*(t-T)) : 0; }
+
+  impChart.data.datasets[0].data = ts.map(t=>({x:+t.toFixed(3),y:+yFull(t).toFixed(5)}));
+  impChart.data.datasets[1].data = ts.map(t=>({x:+t.toFixed(3),y:+yDecay(t).toFixed(5)}));
+  impChart.data.datasets[2].data = ts.map(t=>({x:+t.toFixed(3),y:+yImp(t).toFixed(5)}));
+  impChart.update();
+
+  const yAtTm = (y0*Math.exp(-k*T)).toFixed(3);
+  const yAtTp = (y0*Math.exp(-k*T)+1).toFixed(3);
+  const hl = (Math.log(2)/k).toFixed(2);
+  document.getElementById('impCap').textContent =
+    `k = ${k.toFixed(1)}: half-life = ln2/k ≈ ${hl}. Just before impulse: y ≈ ${yAtTm}. Delta function adds 1 instantly → y jumps to ≈ ${yAtTp}. Both terms then decay at rate k.`;
+}
+upImp();
+</script>
+</body>
+</html>
