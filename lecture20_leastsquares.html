@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Least Squares – Interactive Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0f1117;
+    color: #e8e0d0;
+    font-family: Georgia, 'Times New Roman', serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    font-weight: normal;
+    color: #f0c060;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: #666;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+
+  button {
+    padding: 5px 16px;
+    border-radius: 3px;
+    border: 1.5px solid #444;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: Georgia, serif;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+  }
+
+  button.active-mode  { border-color: #f0c060; background: rgba(240,192,96,0.1);  color: #f0c060; }
+  button.active-resid { border-color: #60a0f0; background: rgba(96,160,240,0.1); color: #60a0f0; }
+  button:hover { opacity: 0.8; }
+
+  .canvas-wrapper {
+    position: relative;
+    width: min(580px, 100%);
+    aspect-ratio: 4/3;
+    background: #161920;
+    border-radius: 8px;
+    border: 1px solid #2a2d3a;
+    cursor: crosshair;
+  }
+
+  canvas { border-radius: 8px; }
+
+  .hint {
+    font-size: 0.72rem;
+    color: #555;
+    margin-top: 6px;
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 14px;
+    padding: 12px 24px;
+    background: #161920;
+    border-radius: 6px;
+    border: 1px solid #2a2d3a;
+  }
+
+  .stat { text-align: center; }
+  .stat-label { font-size: 0.65rem; color: #555; letter-spacing: 0.07em; margin-bottom: 3px; }
+  .stat-val   { font-size: 0.9rem; font-family: 'Courier New', monospace; }
+  .eq-val  { color: #f0c060; }
+  .err-val { color: #60e090; }
+  .sse-val { color: #60a0f0; }
+  .n-val   { color: #aaa; }
+
+  .normal-eq {
+    font-size: 0.72rem;
+    color: #444;
+    margin-top: 10px;
+    letter-spacing: 0.05em;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<h1>Least Squares — Interactive Explorer</h1>
+<p class="subtitle">Lecture 20 · MATH 214</p>
+
+<div class="controls">
+  <button id="btnLine"     class="active-mode"  onclick="setMode('line')">Best-Fit Line</button>
+  <button id="btnParabola"                       onclick="setMode('parabola')">Best-Fit Parabola</button>
+  <button id="btnResid"   class="active-resid"  onclick="toggleResid()">Residuals ON</button>
+  <button onclick="resetPoints()">Reset</button>
+</div>
+
+<div class="canvas-wrapper" id="wrapper">
+  <canvas id="chart"></canvas>
+</div>
+<p class="hint">Click to add a point · Drag to move · Watch the fit update live</p>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">FIT EQUATION</div>
+    <div class="stat-val eq-val"  id="statEq">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">LEAST-SQUARES ERROR ‖b − Ax̂‖</div>
+    <div class="stat-val err-val" id="statErr">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">SUM OF SQUARED RESIDUALS</div>
+    <div class="stat-val sse-val" id="statSSE">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">POINTS</div>
+    <div class="stat-val n-val"   id="statN">—</div>
+  </div>
+</div>
+
+<p class="normal-eq">Normal equation: AᵀA x̂ = Aᵀb</p>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let mode = 'line';
+let showResid = true;
+let dragging = null;   // index of dragged point, or null
+
+let points = [
+  { x: 0, y: 6 },
+  { x: 1, y: 0 },
+  { x: 2, y: 0 },
+];
+
+// ── Least-squares helpers ──────────────────────────────────────────────────
+function fitLine(pts) {
+  const n = pts.length;
+  if (n < 2) return null;
+  const sx = pts.reduce((s,p) => s+p.x, 0);
+  const sy = pts.reduce((s,p) => s+p.y, 0);
+  const sxx = pts.reduce((s,p) => s+p.x*p.x, 0);
+  const sxy = pts.reduce((s,p) => s+p.x*p.y, 0);
+  const det = n*sxx - sx*sx;
+  if (Math.abs(det) < 1e-10) return null;
+  const m = (n*sxy - sx*sy) / det;
+  const c = (sy - m*sx) / n;
+  const res = pts.map(p => p.y - (m*p.x + c));
+  const sse = res.reduce((s,r) => s+r*r, 0);
+  return { m, c, res, error: Math.sqrt(sse),
+           label: `y = ${fmt(m)}x ${c>=0?'+':'−'} ${fmt(Math.abs(c))}` };
+}
+
+function fitParabola(pts) {
+  const n = pts.length;
+  if (n < 3) return null;
+  // Assemble A (rows: [x²,x,1]) and b
+  const A = pts.map(p => [p.x*p.x, p.x, 1]);
+  const b = pts.map(p => p.y);
+  // Normal equation 3×3
+  const ATA = [[0,0,0],[0,0,0],[0,0,0]];
+  const ATb = [0,0,0];
+  for (let i=0;i<n;i++)
+    for (let r=0;r<3;r++) {
+      ATb[r] += A[i][r]*b[i];
+      for (let c2=0;c2<3;c2++) ATA[r][c2] += A[i][r]*A[i][c2];
+    }
+  const d = det3(ATA);
+  if (Math.abs(d) < 1e-10) return null;
+  const a  = det3(replaceCol(ATA,0,ATb))/d;
+  const bv = det3(replaceCol(ATA,1,ATb))/d;
+  const cv = det3(replaceCol(ATA,2,ATb))/d;
+  const res = pts.map(p => p.y - (a*p.x*p.x + bv*p.x + cv));
+  const sse = res.reduce((s,r) => s+r*r, 0);
+  return { a, b:bv, c:cv, res, error: Math.sqrt(sse),
+           label: `y = ${fmt(a)}x² ${bv>=0?'+':'−'} ${fmt(Math.abs(bv))}x ${cv>=0?'+':'−'} ${fmt(Math.abs(cv))}` };
+}
+
+function det3(M) {
+  return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])
+        -M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])
+        +M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+}
+function replaceCol(M,col,v) {
+  return M.map((row,i) => row.map((val,j) => j===col ? v[i] : val));
+}
+function fmt(v) { return Math.abs(v)<100 ? v.toFixed(3) : v.toFixed(1); }
+
+// ── Chart.js setup ─────────────────────────────────────────────────────────
+const XMIN=-1, XMAX=4, YMIN=-4, YMAX=8;
+const STEPS = 120;
+
+function fitCurvePoints() {
+  const fit = mode==='line' ? fitLine(points) : fitParabola(points);
+  if (!fit) return [];
+  const xs = Array.from({length:STEPS+1},(_,i) => XMIN + i*(XMAX-XMIN)/STEPS);
+  return xs.map(x => ({
+    x,
+    y: mode==='line' ? fit.m*x + fit.c
+                     : fit.a*x*x + fit.b*x + fit.c
+  }));
+}
+
+function residualDatasets() {
+  if (!showResid) return [];
+  const fit = mode==='line' ? fitLine(points) : fitParabola(points);
+  if (!fit) return [];
+  return points.map((p, i) => {
+    const yFit = mode==='line' ? fit.m*p.x + fit.c
+                               : fit.a*p.x*p.x + fit.b*p.x + fit.c;
+    return {
+      type: 'line',
+      data: [{x:p.x,y:p.y},{x:p.x,y:yFit}],
+      borderColor: 'rgba(96,160,240,0.7)',
+      borderWidth: 1.5,
+      borderDash: [5,4],
+      pointRadius: 0,
+      tension: 0,
+      order: 2,
+    };
+  });
+}
+
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  data: {
+    datasets: [
+      { // fit curve  (index 0)
+        type: 'line',
+        data: [],
+        borderColor: '#f0c060',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0,
+        order: 3,
+      },
+      { // data points (index 1)
+        type: 'scatter',
+        data: points.map(p=>({x:p.x,y:p.y})),
+        backgroundColor: '#e05050',
+        borderColor: '#ff8080',
+        borderWidth: 1.5,
+        pointRadius: 7,
+        pointHoverRadius: 9,
+        order: 1,
+      },
+    ],
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: true,
+    scales: {
+      x: {
+        type: 'linear', min: XMIN, max: XMAX,
+        grid: { color:'#1e2130' },
+        ticks: { color:'#555', font:{size:11} },
+      },
+      y: {
+        type: 'linear', min: YMIN, max: YMAX,
+        grid: { color:'#1e2130' },
+        ticks: { color:'#555', font:{size:11} },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: false },
+    },
+  },
+});
+
+function redraw() {
+  const fit = mode==='line' ? fitLine(points) : fitParabola(points);
+
+  // Rebuild datasets: residuals + curve + points
+  const rds = residualDatasets();
+  chart.data.datasets = [
+    ...rds,
+    { type:'line', data: fitCurvePoints(),
+      borderColor:'#f0c060', borderWidth:2,
+      pointRadius:0, tension:0, order:3 },
+    { type:'scatter', data: points.map(p=>({x:p.x,y:p.y})),
+      backgroundColor:'#e05050', borderColor:'#ff8080',
+      borderWidth:1.5, pointRadius:7, pointHoverRadius:9, order:1 },
+  ];
+  chart.update('none');
+
+  // Stats
+  if (fit) {
+    document.getElementById('statEq').textContent  = fit.label;
+    document.getElementById('statErr').textContent = fit.error.toFixed(4);
+    document.getElementById('statSSE').textContent = (fit.error**2).toFixed(4);
+  } else {
+    document.getElementById('statEq').textContent  = '—';
+    document.getElementById('statErr').textContent = '—';
+    document.getElementById('statSSE').textContent = '—';
+  }
+  document.getElementById('statN').textContent = points.length;
+}
+
+// ── Mouse / Touch interaction ──────────────────────────────────────────────
+function canvasToData(clientX, clientY) {
+  const ca = chart.chartArea;
+  const rect = document.getElementById('chart').getBoundingClientRect();
+  const px = (clientX - rect.left) * (ctx.canvas.width  / rect.width);
+  const py = (clientY - rect.top)  * (ctx.canvas.height / rect.height);
+  const x = XMIN + (px - ca.left) / (ca.right  - ca.left) * (XMAX - XMIN);
+  const y = YMAX - (py - ca.top)  / (ca.bottom - ca.top)  * (YMAX - YMIN);
+  return { x, y };
+}
+
+function nearestPoint(cx, cy) {
+  const ca = chart.chartArea;
+  const rect = document.getElementById('chart').getBoundingClientRect();
+  const scaleX = ctx.canvas.width  / rect.width;
+  const scaleY = ctx.canvas.height / rect.height;
+  const px = (cx - rect.left) * scaleX;
+  const py = (cy - rect.top)  * scaleY;
+  let best = null, bestD = 16;   // 16 px threshold
+  points.forEach((p, i) => {
+    const sx = ca.left + (p.x-XMIN)/(XMAX-XMIN)*(ca.right-ca.left);
+    const sy = ca.top  + (YMAX-p.y)/(YMAX-YMIN)*(ca.bottom-ca.top);
+    const d  = Math.hypot(px-sx, py-sy);
+    if (d < bestD) { bestD=d; best=i; }
+  });
+  return best;
+}
+
+function getClient(e) {
+  return e.touches ? { cx: e.touches[0].clientX, cy: e.touches[0].clientY }
+                   : { cx: e.clientX, cy: e.clientY };
+}
+
+const wrapper = document.getElementById('wrapper');
+
+wrapper.addEventListener('mousedown', startDrag);
+wrapper.addEventListener('touchstart', startDrag, {passive:false});
+
+function startDrag(e) {
+  e.preventDefault();
+  const {cx,cy} = getClient(e);
+  const idx = nearestPoint(cx, cy);
+  if (idx !== null) {
+    dragging = idx;
+  } else {
+    // Add new point
+    const {x,y} = canvasToData(cx,cy);
+    if (x>=XMIN && x<=XMAX && y>=YMIN && y<=YMAX)
+      points.push({x,y});
+    redraw();
+  }
+}
+
+window.addEventListener('mousemove', moveDrag);
+window.addEventListener('touchmove',  moveDrag, {passive:false});
+
+function moveDrag(e) {
+  if (dragging===null) return;
+  e.preventDefault();
+  const {cx,cy} = getClient(e);
+  const {x,y} = canvasToData(cx,cy);
+  points[dragging] = {
+    x: Math.max(XMIN, Math.min(XMAX, x)),
+    y: Math.max(YMIN, Math.min(YMAX, y)),
+  };
+  redraw();
+}
+
+window.addEventListener('mouseup',  () => { dragging=null; });
+window.addEventListener('touchend', () => { dragging=null; });
+
+// ── UI actions ─────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('btnLine').className     = m==='line'     ? 'active-mode' : '';
+  document.getElementById('btnParabola').className = m==='parabola' ? 'active-mode' : '';
+  redraw();
+}
+
+function toggleResid() {
+  showResid = !showResid;
+  const btn = document.getElementById('btnResid');
+  btn.className = showResid ? 'active-resid' : '';
+  btn.textContent = showResid ? 'Residuals ON' : 'Residuals OFF';
+  redraw();
+}
+
+function resetPoints() {
+  points = [{x:0,y:6},{x:1,y:0},{x:2,y:0}];
+  redraw();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+redraw();
+</script>
+</body>
+</html>
